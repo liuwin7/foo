@@ -9,10 +9,47 @@ import Capacitor
 public class ScreenOrientationPlugin: CAPPlugin {
     private let implementation = ScreenOrientation()
 
-    @objc func echo(_ call: CAPPluginCall) {
-        let value = call.getString("value") ?? ""
-        call.resolve([
-            "value": implementation.echo(value)
-        ])
+    public static var supportedOrientations = UIInterfaceOrientationMask.all
+    
+    public override func load() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(orientationDidChange),
+            name: UIDevice.orientationDidChangeNotification,
+            object: nil)
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    @objc private func orientationDidChange() {
+        if UIDevice.current.orientation.isValidInterfaceOrientation {
+            let orientation = implementation.getCurrentOrientationType()
+            notifyListeners("screenOrientationChange", data: ["type": orientation])
+        }
+    }
+    
+    @objc public func orientation(_ call: CAPPluginCall) {
+        let orientationType = implementation.getCurrentOrientationType()
+        call.resolve(["type": orientationType])
+    }
+    
+    @objc public func lock(_ call: CAPPluginCall) {
+        guard let lockToOrientation = call.getString("orientation") else {
+            call.reject("Input option 'orientation' must be provided")
+            return
+        }
+        implementation.lock(lockToOrientation) { mask in
+            ScreenOrientationPlugin.supportedOrientations = mask
+            call.resolve()
+        }
+    }
+    
+    @objc public func unlock(_ call: CAPPluginCall) {
+        implementation.unlock {
+            ScreenOrientationPlugin.supportedOrientations = UIInterfaceOrientationMask.all
+            call.resolve()
+        }
     }
 }

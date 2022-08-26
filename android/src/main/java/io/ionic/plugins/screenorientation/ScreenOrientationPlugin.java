@@ -1,5 +1,7 @@
 package io.ionic.plugins.screenorientation;
 
+import android.content.res.Configuration;
+
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -9,14 +11,45 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 @CapacitorPlugin(name = "ScreenOrientation")
 public class ScreenOrientationPlugin extends Plugin {
 
-    private ScreenOrientation implementation = new ScreenOrientation();
+    private ScreenOrientation implementation = new ScreenOrientation(getActivity());
 
     @PluginMethod
-    public void echo(PluginCall call) {
-        String value = call.getString("value");
-
+    public void orientation(PluginCall call) {
         JSObject ret = new JSObject();
-        ret.put("value", implementation.echo(value));
+        String type = implementation.getCurrentOrientationType();
+        ret.put("type", type);
         call.resolve(ret);
+    }
+
+    @Override
+    protected void handleOnConfigurationChanged(Configuration newConfig) {
+        super.handleOnConfigurationChanged(newConfig);
+        if (implementation.hasOrientationChanged(newConfig.orientation)) {
+            this.onOrientationChanged();
+        }
+    }
+
+    private void onOrientationChanged() {
+        JSObject ret = new JSObject();
+        String type = implementation.getCurrentOrientationType();
+        ret.put("type", type);
+        notifyListeners("screenOrientationChange", ret);
+    }
+
+    @PluginMethod
+    public void lock(PluginCall call) {
+        String orientationType = call.getString("orientation");
+        if (orientationType == null) {
+            call.reject("Input option 'orientation' must be provided!");
+            return;
+        }
+        implementation.lock(orientationType);
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void unlock(PluginCall call) {
+        implementation.unlock();
+        call.resolve();
     }
 }
